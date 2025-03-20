@@ -16,6 +16,8 @@ class Migrator extends Command
 
     protected $query;
 
+    protected $newDbName = 'tenantet';
+
     public function handle()
     {
         $this->init($this->table->value);
@@ -28,14 +30,40 @@ class Migrator extends Command
 
     public function handleProductCategories()
     {
-        dd('pc');
+        $cats = $this->query->get();
+
+        $preparedCats = [];
+
+        $cats->each(function ($item) use (&$preparedCats) {
+            $preparedCats[] = ['name' => $item->name];
+        });
+
+        $this->changedb();
+
         $this->query->get();
+
+        // prune categories table of another db and populate it again using createMany
+
+        /* conversion */
     }
 
-    public function handleProducts()
+    public function changedb()
     {
-        dd('pr');
-        $this->query->get();
+        DB::purge('mysql');
+
+        config(['database.connections.mysql.database' => $this->newDbName]);
+
+        DB::reconnect('mysql');
+
+        $newTablePrefix = 'pos_';
+
+        $newTable = match ($this->table) {
+            TableEnum::ProductsCategories =>  $newTablePrefix . 'product_categories',
+        };
+
+        $this->init($newTable);
+
+        dd($this->query->get());
     }
 
     public function init($table)
