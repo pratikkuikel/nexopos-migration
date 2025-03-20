@@ -1,0 +1,75 @@
+<?php
+
+namespace App;
+
+enum TableEnum: string
+{
+    case FailedJobs = 'failed_jobs';
+    case Jobs = 'jobs';
+    case Migrations = 'migrations';
+    case CashFlow = 'nexopos_cash_flow';
+    case Coupons = 'nexopos_coupons';
+    case CouponsCategories = 'nexopos_coupons_categories';
+    case CouponsProducts = 'nexopos_coupons_products';
+    case CustomerPayments = 'nexopos_customer_payments';
+    case Customers = 'nexopos_customers';
+    case CustomersAccountHistory = 'nexopos_customers_account_history';
+    case CustomersAddresses = 'nexopos_customers_addresses';
+    case CustomersCoupons = 'nexopos_customers_coupons';
+    case CustomersGroups = 'nexopos_customers_groups';
+    case CustomersMetas = 'nexopos_customers_metas';
+    case CustomersRewards = 'nexopos_customers_rewards';
+    case DashboardDays = 'nexopos_dashboard_days';
+    case DashboardMonths = 'nexopos_dashboard_months';
+    case DashboardWeeks = 'nexopos_dashboard_weeks';
+    case Expenses = 'nexopos_expenses';
+    case ExpensesCategories = 'nexopos_expenses_categories';
+    case Medias = 'nexopos_medias';
+    case ModulesMigrations = 'nexopos_modules_migrations';
+    case Notifications = 'nexopos_notifications';
+    case Options = 'nexopos_options';
+    case Orders = 'nexopos_orders';
+    case OrdersAddresses = 'nexopos_orders_addresses';
+    case OrdersCount = 'nexopos_orders_count';
+    case OrdersCoupons = 'nexopos_orders_coupons';
+    case OrdersInstalments = 'nexopos_orders_instalments';
+    case OrdersMetas = 'nexopos_orders_metas';
+    case OrdersPayments = 'nexopos_orders_payments';
+    case OrdersProducts = 'nexopos_orders_products';
+    case OrdersProductsRefunds = 'nexopos_orders_products_refunds';
+    case OrdersRefunds = 'nexopos_orders_refunds';
+    case OrdersStorage = 'nexopos_orders_storage';
+    case OrdersTaxes = 'nexopos_orders_taxes';
+    case PaymentsTypes = 'nexopos_payments_types';
+    case Permissions = 'nexopos_permissions';
+    case Procurements = 'nexopos_procurements';
+    case ProcurementsProducts = 'nexopos_procurements_products';
+    case Products = 'nexopos_products';
+    case ProductsCategories = 'nexopos_products_categories';
+    case ProductsGalleries = 'nexopos_products_galleries';
+    case ProductsHistories = 'nexopos_products_histories';
+    case ProductsMetas = 'nexopos_products_metas';
+    case ProductsSubitems = 'nexopos_products_subitems';
+    case ProductsTaxes = 'nexopos_products_taxes';
+    case ProductsUnitQuantities = 'nexopos_products_unit_quantities';
+    case ProviderPayments = 'nexopos_provider_payments';
+    case Providers = 'nexopos_providers';
+    case Registers = 'nexopos_registers';
+    case RegistersHistory = 'nexopos_registers_history';
+    case RewardsSystem = 'nexopos_rewards_system';
+    case RewardsSystemRules = 'nexopos_rewards_system_rules';
+    case RolePermission = 'nexopos_role_permission';
+    case Roles = 'nexopos_roles';
+    case Taxes = 'nexopos_taxes';
+    case TaxesGroups = 'nexopos_taxes_groups';
+    case Units = 'nexopos_units';
+    case UnitsGroups = 'nexopos_units_groups';
+    case Users = 'nexopos_users';
+    case UsersAttributes = 'nexopos_users_attributes';
+    case UsersRolesRelations = 'nexopos_users_roles_relations';
+    case PersonalAccessTokens = 'personal_access_tokens';
+    case TelescopeEntries = 'telescope_entries';
+    case TelescopeEntriesTags = 'telescope_entries_tags';
+    case TelescopeMonitoring = 'telescope_monitoring';
+    case WebsocketsStatisticsEntries = 'websockets_statistics_entries';
+}
