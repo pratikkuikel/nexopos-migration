@@ -62,8 +62,6 @@ class Migrator extends Command
         };
 
         $this->init($newTable);
-
-        dd($this->query->get());
     }
 
     public function init($table)
