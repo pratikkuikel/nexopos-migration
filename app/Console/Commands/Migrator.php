@@ -19,6 +19,7 @@ class Migrator extends Command
     // protected $table = TableEnum::Customers;
     // protected $table = TableEnum::Orders;
     protected $table = TableEnum::OrdersProducts;
+    /* Include timestamps too broooo */
 
     protected $query;
 
