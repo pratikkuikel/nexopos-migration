@@ -52,6 +52,7 @@ enum TableEnum: string
     case ProductsSubitems = 'nexopos_products_subitems';
     case ProductsTaxes = 'nexopos_products_taxes';
     case ProductsUnitQuantities = 'nexopos_products_unit_quantities';
+    case ProductsUnitQuantitiesInventory = 'products_unit_quantities';
     case ProviderPayments = 'nexopos_provider_payments';
     case Providers = 'nexopos_providers';
     case Registers = 'nexopos_registers';
