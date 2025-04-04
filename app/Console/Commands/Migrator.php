@@ -10,24 +10,41 @@ class Migrator extends Command
 {
     protected $signature = 'hey';
 
-    // protected $table = TableEnum::ProductsCategories;
-    // protected $table = TableEnum::Products;
-    // protected $table = TableEnum::UnitsGroups;
-    // protected $table = TableEnum::Units;
-    // protected $table = TableEnum::ProductsUnitQuantities;
-    // protected $table = TableEnum::ProductsUnitQuantitiesInventory;
-    // protected $table = TableEnum::Customers;
-    // protected $table = TableEnum::Orders;
-    protected $table = TableEnum::OrdersProducts;
-    /* Include timestamps too broooo */
+    protected $table = null;
 
     protected $query;
 
-    protected $newDbName = 'tenant9';
+    protected $newDbName = 'tenant1';
 
     /* 5151 to sewasanitary */
 
     public function handle()
+    {
+        $tables = [
+            TableEnum::ProductsCategories,
+            TableEnum::Products,
+            TableEnum::UnitsGroups,
+            TableEnum::Units,
+            TableEnum::ProductsUnitQuantities,
+            TableEnum::ProductsUnitQuantitiesInventory,
+            TableEnum::Customers,
+            TableEnum::Orders,
+            TableEnum::OrdersProducts,
+            TableEnum::Providers,
+            TableEnum::Procurements,
+            TableEnum::ProcurementsProducts,
+        ];
+
+        foreach ($tables as $table) {
+            $this->table = $table;
+
+            $this->processData();
+
+            $this->resetdb();
+        }
+    }
+
+    public function processData()
     {
         if ($this->table == TableEnum::ProductsUnitQuantitiesInventory) {
 
@@ -46,8 +63,158 @@ class Migrator extends Command
             TableEnum::Customers => $this->handleCustomers(),
             TableEnum::Orders => $this->handleOrders(),
             TableEnum::OrdersProducts => $this->handleOrderProducts(),
+            TableEnum::Providers => $this->handleProviders(),
+            TableEnum::Procurements => $this->handleProcurements(),
+            TableEnum::ProcurementsProducts => $this->handleProcurementProducts(),
         };
     }
+
+    public function handleProviders()
+    {
+        /* 5151 db */
+        $purchases = $this->query->get();
+
+        $data = [];
+
+        $purchases->each(function ($item) use (&$data) {
+
+            $total_purchased = DB::table('nexopos_procurements')
+                ->where('provider_id', $item->id)
+                ->sum('cost');
+
+            $data[] = [
+                'id' => $item->id,
+                'name' => $item->name,
+                'phone' => $item->phone,
+                'total_purchased' => intval($total_purchased) * 100,
+                'total_paid' => intval($item->amount_paid) * 100,
+                'total_due' => intval($item->amount_due) * 100,
+                'created_at' => $item->created_at,
+                'updated_at' => $item->updated_at
+            ];
+        });
+
+        $collection = collect($data);
+
+        $chunks = $collection->chunk(100);
+
+        $chunks->toArray();
+
+        $this->changedb();
+
+        /* New sewasanitary db */
+
+        /* prune existing products */
+        $this->query->delete();
+
+        /* Copy products */
+        foreach ($chunks as $chunk) {
+            $this->query->insert($chunk->toArray());
+        }
+
+        $this->createSupplierOpeningBalance($data);
+
+        $this->info('Providers / suppliers copied !');
+    }
+
+
+    public function createSupplierOpeningBalance($data)
+    {
+
+        foreach (DB::table('pos_suppliers')->get() as $supplier) {
+            DB::table('pos_ledgers')->insert([
+                'ledgerable_type' => 'App\Models\Tenant\Pos\Supplier',
+                'ledgerable_id' => $supplier->id,
+                'type' => 'opening-balance',
+                'amount' => $supplier->total_due,
+                'balance' => $supplier->total_due,
+                'created_at' => now(),
+                'updated_at' => now()
+            ]);
+        }
+    }
+
+    public function handleProcurements()
+    {
+        /* 5151 db */
+        $purchases = $this->query->get();
+
+        $data = [];
+
+        $purchases->each(function ($item) use (&$data) {
+            $data[] = [
+                'id' => $item->id,
+                'notes' => $item->name,
+                'supplier_id' => $item->provider_id,
+                'purchase_date' => $item->invoice_date ?? now(),
+                'invoice_number' => $item->invoice_reference,
+                'total_amount' => intval($item->cost) * 100,
+                'created_at' => $item->created_at,
+                'updated_at' => $item->updated_at
+            ];
+        });
+
+        $collection = collect($data);
+
+        $chunks = $collection->chunk(100);
+
+        $chunks->toArray();
+
+        $this->changedb();
+
+        /* New sewasanitary db */
+
+        /* prune existing products */
+        $this->query->delete();
+
+        /* Copy products */
+        foreach ($chunks as $chunk) {
+            $this->query->insert($chunk->toArray());
+        }
+
+        $this->info('Purchases copied !');
+    }
+
+    public function handleProcurementProducts()
+    {
+        /* 5151 db */
+        $products = $this->query->get();
+
+        $data = [];
+
+        $products->each(function ($item) use (&$data) {
+            $data[] = [
+                'id' => $item->id,
+                'purchase_id' => $item->procurement_id,
+                'product_id' => $item->product_id,
+                'quantity' => $item->quantity,
+                'amount' => intval($item->purchase_price) * 100,
+                'created_at' => $item->created_at,
+                'updated_at' => $item->updated_at
+            ];
+        });
+
+        $collection = collect($data);
+
+        $chunks = $collection->chunk(100);
+
+        $chunks->toArray();
+
+        $this->changedb();
+
+        /* New sewasanitary db */
+
+        /* prune existing products */
+        $this->query->delete();
+
+        /* Copy products */
+        foreach ($chunks as $chunk) {
+            $this->query->insert($chunk->toArray());
+        }
+
+        $this->info('Purchase items copied !');
+    }
+
 
     public function handleProductCategories()
     {
@@ -59,7 +226,9 @@ class Migrator extends Command
         $cats->each(function ($item) use (&$preparedCats) {
             $preparedCats[] = [
                 'id' => $item->id,
-                'name' => $item->name
+                'name' => ucwords($item->name),
+                'created_at' => $item->created_at,
+                'updated_at' => $item->updated_at
             ];
         });
 
@@ -88,7 +257,9 @@ class Migrator extends Command
                 'id' => $item->id,
                 'name' => $item->name,
                 'category_id' => $item->category_id,
-                'visible' => true
+                'visible' => true,
+                'created_at' => $item->created_at,
+                'updated_at' => $item->updated_at
             ];
         });
 
@@ -123,7 +294,9 @@ class Migrator extends Command
         $groups->each(function ($item) use (&$preparedGroups) {
             $preparedGroups[] = [
                 'id' => $item->id,
-                'name' => $item->name
+                'name' => ucfirst($item->name),
+                'created_at' => $item->created_at,
+                'updated_at' => $item->updated_at
             ];
         });
 
@@ -150,8 +323,10 @@ class Migrator extends Command
         $units->each(function ($item) use (&$preparedUnits) {
             $preparedUnits[] = [
                 'id' => $item->id,
-                'name' => $item->name,
-                'unit_group_id' => $item->group_id
+                'name' => ucfirst($item->name),
+                'unit_group_id' => $item->group_id,
+                'created_at' => $item->created_at,
+                'updated_at' => $item->updated_at
             ];
         });
 
@@ -185,6 +360,8 @@ class Migrator extends Command
                 'conversion_factor' => 1,
                 'price' => $item->sale_price * 100, //convert to paisa while storing
                 'is_base' => true,
+                'created_at' => $item->created_at,
+                'updated_at' => $item->updated_at
             ];
         });
 
@@ -221,6 +398,8 @@ class Migrator extends Command
                 'id' => $item->id,
                 'product_id' => $item->product_id,
                 'current_stock' => $item->quantity,
+                'created_at' => $item->created_at,
+                'updated_at' => $item->updated_at
             ];
         });
 
@@ -253,10 +432,20 @@ class Migrator extends Command
         $data = [];
 
         $customers->each(function ($item) use (&$data) {
+
+            $total_sold = DB::table('nexopos_orders')
+                ->where('customer_id', $item->id)
+                ->sum('total');
+
             $data[] = [
                 'id' => $item->id,
-                'name' => $item->name,
+                'name' => ucwords($item->name),
                 'phone' => $item->phone,
+                'total_sold' => intval(($total_sold * 100)),
+                'total_due' => intval(($item->owed_amount * 100)),
+                'total_paid' => intval(($total_sold - $item->owed_amount) * 100),
+                'created_at' => $item->created_at,
+                'updated_at' => $item->updated_at
             ];
         });
 
@@ -278,7 +467,28 @@ class Migrator extends Command
             $this->query->insert($chunk->toArray());
         }
 
+        // Create ledger entry opening balance for due amount
+
+        $this->createCustomerOpeningBalance($data);
+
         $this->info('Customers copied !');
+    }
+
+    public function createCustomerOpeningBalance($data)
+    {
+        DB::table('pos_ledgers')->delete();
+
+        foreach (DB::table('pos_customers')->get() as $customer) {
+            DB::table('pos_ledgers')->insert([
+                'ledgerable_type' => 'App\Models\Tenant\Pos\Customer',
+                'ledgerable_id' => $customer->id,
+                'type' => 'opening-balance',
+                'amount' => $customer->total_due,
+                'balance' => $customer->total_due,
+                'created_at' => now(),
+                'updated_at' => now()
+            ]);
+        }
     }
 
     public function handleOrders()
@@ -297,6 +507,8 @@ class Migrator extends Command
                 'discount' => $item->discount * 100,
                 'status' => 'confirmed',
                 'notes' => $item->note,
+                'created_at' => $item->created_at,
+                'updated_at' => $item->updated_at
             ];
         });
 
@@ -336,6 +548,8 @@ class Migrator extends Command
                 'product_id' => $item->product_id,
                 'quantity' => $item->quantity,
                 'amount' => $item->unit_price * 100,
+                'created_at' => $item->created_at,
+                'updated_at' => $item->updated_at
             ];
         });
 
@@ -360,6 +574,15 @@ class Migrator extends Command
         $this->info('Order items copied !');
     }
 
+    public function resetdb()
+    {
+        DB::purge('mysql');
+
+        config(['database.connections.mysql.database' => '5151']);
+
+        DB::reconnect('mysql');
+    }
+
     public function changedb()
     {
         DB::purge('mysql');
@@ -380,6 +603,9 @@ class Migrator extends Command
             TableEnum::Customers =>  $newTablePrefix . 'customers',
             TableEnum::Orders =>  $newTablePrefix . 'sales',
             TableEnum::OrdersProducts =>  $newTablePrefix . 'sales_items',
+            TableEnum::Providers => $newTablePrefix . 'suppliers',
+            TableEnum::Procurements =>  $newTablePrefix . 'purchases',
+            TableEnum::ProcurementsProducts =>  $newTablePrefix . 'purchase_items',
         };
 
         $this->init($newTable);
