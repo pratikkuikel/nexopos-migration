@@ -33,6 +33,8 @@ class Migrator extends Command
             TableEnum::Providers,
             TableEnum::Procurements,
             TableEnum::ProcurementsProducts,
+            TableEnum::OrdersRefunds,
+            TableEnum::OrdersProductsRefunds
         ];
 
         foreach ($tables as $table) {
@@ -66,6 +68,8 @@ class Migrator extends Command
             TableEnum::Providers => $this->handleProviders(),
             TableEnum::Procurements => $this->handleProcurements(),
             TableEnum::ProcurementsProducts => $this->handleProcurementProducts(),
+            TableEnum::OrdersRefunds => $this->handleOrderRefunds(),
+            TableEnum::OrdersProductsRefunds => $this->handleOrderRefundItems()
         };
     }
 
@@ -469,12 +473,12 @@ class Migrator extends Command
 
         // Create ledger entry opening balance for due amount
 
-        $this->createCustomerOpeningBalance($data);
+        $this->createCustomerOpeningBalance();
 
         $this->info('Customers copied !');
     }
 
-    public function createCustomerOpeningBalance($data)
+    public function createCustomerOpeningBalance()
     {
         DB::table('pos_ledgers')->delete();
 
@@ -574,6 +578,95 @@ class Migrator extends Command
         $this->info('Order items copied !');
     }
 
+    public function handleOrderRefunds()
+    {
+        /* 5151 db */
+        $orderReturns = $this->query->get();
+
+        $data = [];
+
+        /* sale_id, product_id, quantity, amount */
+        $orderReturns->each(function ($item) use (&$data) {
+            if (in_array($item->order_id, [332, 186])) {
+                // These orders doesn't exist
+                return;
+            }
+            $data[] = [
+                'id' => $item->id,
+                'sale_id' => $item->order_id,
+                'amount' => $item->total * 100,
+                'return_date' => $item->created_at,
+                'created_at' => $item->created_at,
+                'updated_at' => $item->updated_at
+            ];
+        });
+
+        $collection = collect($data);
+
+        $chunks = $collection->chunk(100);
+
+        $chunks->toArray();
+
+        $this->changedb();
+
+        /* New sewasanitary db */
+
+        /* prune existing sales items */
+        $this->query->delete();
+
+        /* Copy order_products to sales_items */
+        foreach ($chunks as $chunk) {
+            $this->query->insert($chunk->toArray());
+        }
+
+        $this->info('Order returns processed !');
+    }
+
+    public function handleOrderRefundItems()
+    {
+        /* 5151 db */
+        $orderReturnItems = $this->query->get();
+
+        $data = [];
+
+        $orderReturnItems->each(function ($item) use (&$data) {
+
+            if (in_array($item->order_id, [332, 186])) {
+                // These orders doesn't exist
+                return;
+            }
+            $data[] = [
+                'id' => $item->id,
+                'sales_return_id' => $item->order_refund_id,
+                'product_id' => $item->product_id,
+                'quantity' => $item->quantity,
+                'amount' => $item->unit_price * 100,
+                'created_at' => $item->created_at,
+                'updated_at' => $item->updated_at
+            ];
+        });
+
+        $collection = collect($data);
+
+        $chunks = $collection->chunk(100);
+
+        $chunks->toArray();
+
+        $this->changedb();
+
+        /* New sewasanitary db */
+
+        /* prune existing sales items */
+        $this->query->delete();
+
+        /* Copy order_products to sales_items */
+        foreach ($chunks as $chunk) {
+            $this->query->insert($chunk->toArray());
+        }
+
+        $this->info('Order return items processed !');
+    }
+
     public function resetdb()
     {
         DB::purge('mysql');
@@ -606,6 +699,8 @@ class Migrator extends Command
             TableEnum::Providers => $newTablePrefix . 'suppliers',
             TableEnum::Procurements =>  $newTablePrefix . 'purchases',
             TableEnum::ProcurementsProducts =>  $newTablePrefix . 'purchase_items',
+            TableEnum::OrdersRefunds =>  $newTablePrefix . 'sales_returns',
+            TableEnum::OrdersProductsRefunds =>  $newTablePrefix . 'sales_return_items',
         };
 
         $this->init($newTable);
