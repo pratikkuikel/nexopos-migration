@@ -14,7 +14,9 @@ class Migrator extends Command
 
     protected $query;
 
-    protected $newDbName = 'tenant1';
+    protected $from = '5151';
+
+    protected $newDbName = 'tenant7';
 
     /* 5151 to sewasanitary */
 
@@ -578,7 +580,7 @@ class Migrator extends Command
     {
         DB::purge('mysql');
 
-        config(['database.connections.mysql.database' => '5151']);
+        config(['database.connections.mysql.database' => $this->from]);
 
         DB::reconnect('mysql');
     }
