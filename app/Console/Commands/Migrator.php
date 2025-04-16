@@ -537,6 +537,67 @@ class Migrator extends Command
         }
 
         $this->info('Orders / sales copied !');
+
+        // process order payments
+
+        $order_payments = [];
+
+        $order_dues = [];
+
+        $this->resetdb();
+
+        $orders->each(function ($item) use (&$order_payments, &$order_dues) {
+
+            $payments = DB::table('nexopos_orders_payments')->where('order_id', $item->id)->get();
+
+            $total_paid = DB::table('nexopos_orders_payments')->where('order_id', $item->id)->sum('value');
+
+            $order_total = $item->total;
+
+            if ($total_paid < $order_total) {
+                $order_dues[] = [
+                    'dueable_type' => 'App\Models\Tenant\Pos\Sale',
+                    'dueable_id' => $item->id, //order id
+                    'amount' => intval($order_total - $total_paid) * 100,
+                    'status' => 'due',
+                    'created_at' => $item->created_at,
+                    'updated_at' => $item->updated_at,
+                ];
+            }
+
+            foreach ($payments as $item) {
+                $order_payments[] = [
+                    'payable_type' => 'App\Models\Tenant\Pos\Sale',
+                    'payable_id' => $item->order_id,
+                    'method' => $item->identifier == 'Bank Payment' ? 'Bank' : 'Cash',
+                    'amount' => (int) $item->value * 100,
+                    'type' => 'sale',
+                    'created_at' => $item->created_at,
+                    'updated_at' => $item->updated_at,
+                ];
+            }
+        });
+
+        $this->changeToTargetDb();
+
+        DB::table('pos_payment_dues')->delete();
+
+        // insert dues
+        DB::table('pos_payment_dues')
+            ->insert($order_dues);
+
+        DB::table('pos_payments')->delete();
+        
+        // insert payments
+        foreach ($order_payments as $data) {
+            DB::table('pos_payments')
+                ->insert($data);
+        }
+
+        $this->info('order payments copied !');
+
+        // get order payments from nexopos_orders_payments, total payments for each order
+        // create payment entry for order and also create due entry for remaining amount
     }
 
     public function handleOrderProducts()
@@ -677,6 +738,16 @@ class Migrator extends Command
 
         DB::reconnect('mysql');
     }
+
+    public function changeToTargetDb()
+    {
+        DB::purge('mysql');
+
+        config(['database.connections.mysql.database' => $this->newDbName]);
+
+        DB::reconnect('mysql');
+    }
+
 
     public function changedb()
     {
