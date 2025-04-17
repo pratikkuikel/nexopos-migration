@@ -36,7 +36,7 @@ class Migrator extends Command
             TableEnum::Procurements,
             TableEnum::ProcurementsProducts,
             TableEnum::OrdersRefunds,
-            TableEnum::OrdersProductsRefunds
+            TableEnum::OrdersProductsRefunds,
         ];
 
         foreach ($tables as $table) {
@@ -52,7 +52,7 @@ class Migrator extends Command
     {
         if ($this->table == TableEnum::ProductsUnitQuantitiesInventory) {
 
-            $this->init('nexopos_' . $this->table->value);
+            $this->init('nexopos_'.$this->table->value);
         } else {
             $this->init($this->table->value);
         }
@@ -96,7 +96,7 @@ class Migrator extends Command
                 'total_paid' => intval($item->amount_paid) * 100,
                 'total_due' => intval($item->amount_due) * 100,
                 'created_at' => $item->created_at,
-                'updated_at' => $item->updated_at
+                'updated_at' => $item->updated_at,
             ];
         });
 
@@ -123,7 +123,6 @@ class Migrator extends Command
         $this->info('Providers / suppliers copied !');
     }
 
-
     public function createSupplierOpeningBalance($data)
     {
 
@@ -135,7 +134,7 @@ class Migrator extends Command
                 'amount' => $supplier->total_due,
                 'balance' => $supplier->total_due,
                 'created_at' => now(),
-                'updated_at' => now()
+                'updated_at' => now(),
             ]);
         }
     }
@@ -156,7 +155,7 @@ class Migrator extends Command
                 'invoice_number' => $item->invoice_reference,
                 'total_amount' => intval($item->cost) * 100,
                 'created_at' => $item->created_at,
-                'updated_at' => $item->updated_at
+                'updated_at' => $item->updated_at,
             ];
         });
 
@@ -196,7 +195,7 @@ class Migrator extends Command
                 'quantity' => $item->quantity,
                 'amount' => intval($item->purchase_price) * 100,
                 'created_at' => $item->created_at,
-                'updated_at' => $item->updated_at
+                'updated_at' => $item->updated_at,
             ];
         });
 
@@ -221,7 +220,6 @@ class Migrator extends Command
         $this->info('Purchase items copied !');
     }
 
-
     public function handleProductCategories()
     {
         /* 5151 db */
@@ -234,7 +232,7 @@ class Migrator extends Command
                 'id' => $item->id,
                 'name' => ucwords($item->name),
                 'created_at' => $item->created_at,
-                'updated_at' => $item->updated_at
+                'updated_at' => $item->updated_at,
             ];
         });
 
@@ -265,7 +263,7 @@ class Migrator extends Command
                 'category_id' => $item->category_id,
                 'visible' => true,
                 'created_at' => $item->created_at,
-                'updated_at' => $item->updated_at
+                'updated_at' => $item->updated_at,
             ];
         });
 
@@ -302,7 +300,7 @@ class Migrator extends Command
                 'id' => $item->id,
                 'name' => ucfirst($item->name),
                 'created_at' => $item->created_at,
-                'updated_at' => $item->updated_at
+                'updated_at' => $item->updated_at,
             ];
         });
 
@@ -332,7 +330,7 @@ class Migrator extends Command
                 'name' => ucfirst($item->name),
                 'unit_group_id' => $item->group_id,
                 'created_at' => $item->created_at,
-                'updated_at' => $item->updated_at
+                'updated_at' => $item->updated_at,
             ];
         });
 
@@ -356,18 +354,18 @@ class Migrator extends Command
 
         $data = [];
 
-        /* gets  */
-        /*needs product_id, unit_id, price conversion_factor, is_base, */
+        /* gets */
+        /* needs product_id, unit_id, price conversion_factor, is_base, */
         $products->each(function ($item) use (&$data) {
             $data[] = [
                 'id' => $item->id,
                 'product_id' => $item->product_id,
                 'unit_id' => $item->unit_id,
                 'conversion_factor' => 1,
-                'price' => $item->sale_price * 100, //convert to paisa while storing
+                'price' => $item->sale_price * 100, // convert to paisa while storing
                 'is_base' => true,
                 'created_at' => $item->created_at,
-                'updated_at' => $item->updated_at
+                'updated_at' => $item->updated_at,
             ];
         });
 
@@ -405,7 +403,7 @@ class Migrator extends Command
                 'product_id' => $item->product_id,
                 'current_stock' => $item->quantity,
                 'created_at' => $item->created_at,
-                'updated_at' => $item->updated_at
+                'updated_at' => $item->updated_at,
             ];
         });
 
@@ -451,7 +449,7 @@ class Migrator extends Command
                 'total_due' => intval(($item->owed_amount * 100)),
                 'total_paid' => intval(($total_sold - $item->owed_amount) * 100),
                 'created_at' => $item->created_at,
-                'updated_at' => $item->updated_at
+                'updated_at' => $item->updated_at,
             ];
         });
 
@@ -492,7 +490,7 @@ class Migrator extends Command
                 'amount' => $customer->total_due,
                 'balance' => $customer->total_due,
                 'created_at' => now(),
-                'updated_at' => now()
+                'updated_at' => now(),
             ]);
         }
     }
@@ -514,7 +512,7 @@ class Migrator extends Command
                 'status' => 'confirmed',
                 'notes' => $item->note,
                 'created_at' => $item->created_at,
-                'updated_at' => $item->updated_at
+                'updated_at' => $item->updated_at,
             ];
         });
 
@@ -557,7 +555,7 @@ class Migrator extends Command
             if ($total_paid < $order_total) {
                 $order_dues[] = [
                     'dueable_type' => 'App\Models\Tenant\Pos\Sale',
-                    'dueable_id' => $item->id, //order id
+                    'dueable_id' => $item->id, // order id
                     'amount' => intval($order_total - $total_paid) * 100,
                     'status' => 'due',
                     'created_at' => $item->created_at,
@@ -587,7 +585,7 @@ class Migrator extends Command
             ->insert($order_dues);
 
         DB::table('pos_payments')->delete();
-        
+
         // insert payments
         foreach ($order_payments as $data) {
             DB::table('pos_payments')
@@ -616,7 +614,7 @@ class Migrator extends Command
                 'quantity' => $item->quantity,
                 'amount' => $item->unit_price * 100,
                 'created_at' => $item->created_at,
-                'updated_at' => $item->updated_at
+                'updated_at' => $item->updated_at,
             ];
         });
 
@@ -660,7 +658,7 @@ class Migrator extends Command
                 'amount' => $item->total * 100,
                 'return_date' => $item->created_at,
                 'created_at' => $item->created_at,
-                'updated_at' => $item->updated_at
+                'updated_at' => $item->updated_at,
             ];
         });
 
@@ -705,7 +703,7 @@ class Migrator extends Command
                 'quantity' => $item->quantity,
                 'amount' => $item->unit_price * 100,
                 'created_at' => $item->created_at,
-                'updated_at' => $item->updated_at
+                'updated_at' => $item->updated_at,
             ];
         });
 
@@ -748,7 +746,6 @@ class Migrator extends Command
         DB::reconnect('mysql');
     }
 
-
     public function changedb()
     {
         DB::purge('mysql');
@@ -760,20 +757,20 @@ class Migrator extends Command
         $newTablePrefix = 'pos_';
 
         $newTable = match ($this->table) {
-            TableEnum::ProductsCategories =>  $newTablePrefix . 'product_categories',
-            TableEnum::Products =>  $newTablePrefix . 'products',
-            TableEnum::UnitsGroups =>  $newTablePrefix . 'unit_groups',
-            TableEnum::Units =>  $newTablePrefix . 'units',
-            TableEnum::ProductsUnitQuantities =>  $newTablePrefix . 'product_units',
-            TableEnum::ProductsUnitQuantitiesInventory =>  $newTablePrefix . 'inventories',
-            TableEnum::Customers =>  $newTablePrefix . 'customers',
-            TableEnum::Orders =>  $newTablePrefix . 'sales',
-            TableEnum::OrdersProducts =>  $newTablePrefix . 'sales_items',
-            TableEnum::Providers => $newTablePrefix . 'suppliers',
-            TableEnum::Procurements =>  $newTablePrefix . 'purchases',
-            TableEnum::ProcurementsProducts =>  $newTablePrefix . 'purchase_items',
-            TableEnum::OrdersRefunds =>  $newTablePrefix . 'sales_returns',
-            TableEnum::OrdersProductsRefunds =>  $newTablePrefix . 'sales_return_items',
+            TableEnum::ProductsCategories => $newTablePrefix.'product_categories',
+            TableEnum::Products => $newTablePrefix.'products',
+            TableEnum::UnitsGroups => $newTablePrefix.'unit_groups',
+            TableEnum::Units => $newTablePrefix.'units',
+            TableEnum::ProductsUnitQuantities => $newTablePrefix.'product_units',
+            TableEnum::ProductsUnitQuantitiesInventory => $newTablePrefix.'inventories',
+            TableEnum::Customers => $newTablePrefix.'customers',
+            TableEnum::Orders => $newTablePrefix.'sales',
+            TableEnum::OrdersProducts => $newTablePrefix.'sales_items',
+            TableEnum::Providers => $newTablePrefix.'suppliers',
+            TableEnum::Procurements => $newTablePrefix.'purchases',
+            TableEnum::ProcurementsProducts => $newTablePrefix.'purchase_items',
+            TableEnum::OrdersRefunds => $newTablePrefix.'sales_returns',
+            TableEnum::OrdersProductsRefunds => $newTablePrefix.'sales_return_items',
         };
 
         $this->init($newTable);
