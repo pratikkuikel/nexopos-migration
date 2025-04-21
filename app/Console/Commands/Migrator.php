@@ -14,9 +14,9 @@ class Migrator extends Command
 
     protected $query;
 
-    protected $from = '5151';
+    protected $from = 'sewa5151';
 
-    protected $newDbName = 'tenant7';
+    protected $newDbName = 'tenant1';
 
     /* 5151 to sewasanitary */
 
@@ -52,7 +52,7 @@ class Migrator extends Command
     {
         if ($this->table == TableEnum::ProductsUnitQuantitiesInventory) {
 
-            $this->init('nexopos_'.$this->table->value);
+            $this->init('nexopos_' . $this->table->value);
         } else {
             $this->init($this->table->value);
         }
@@ -146,7 +146,11 @@ class Migrator extends Command
 
         $data = [];
 
-        $purchases->each(function ($item) use (&$data) {
+        $dues = [];
+
+        $payments = [];
+
+        $purchases->each(function ($item) use (&$data, &$payments, &$dues) {
             $data[] = [
                 'id' => $item->id,
                 'notes' => $item->name,
@@ -157,6 +161,37 @@ class Migrator extends Command
                 'created_at' => $item->created_at,
                 'updated_at' => $item->updated_at,
             ];
+
+            $paid_amount = 0;
+
+            if ($item->due_amount == 0) {
+                $paid_amount = $item->cost;
+            } elseif ($item->due_amount == $item->cost) {
+                $paid_amount = 0;
+            } else {
+                $paid_amount = $item->cost - $item->due_amount;
+            }
+
+            $payments[] = [
+                'payable_type' => 'App\Models\Tenant\Pos\Purchase',
+                'payable_id' => $item->id,
+                'method' => 'Bank',
+                'amount' => intval($paid_amount) * 100,
+                'type' => 'purchase',
+                'created_at' => $item->created_at,
+                'updated_at' => $item->updated_at,
+            ];
+
+            if ($item->due_amount != 0) {
+                $dues[] = [
+                    'dueable_type' => 'App\Models\Tenant\Pos\Purchase',
+                    'dueable_id' => $item->id, // purchase id
+                    'amount' => intval($item->due_amount) * 100,
+                    'status' => 'due',
+                    'created_at' => $item->created_at,
+                    'updated_at' => $item->updated_at,
+                ];
+            }
         });
 
         $collection = collect($data);
@@ -169,7 +204,7 @@ class Migrator extends Command
 
         /* New sewasanitary db */
 
-        /* prune existing products */
+        /* prune existing purchases */
         $this->query->delete();
 
         /* Copy products */
@@ -178,6 +213,24 @@ class Migrator extends Command
         }
 
         $this->info('Purchases copied !');
+
+        // handle procurements payment and due  
+
+        DB::table('pos_payments')
+            ->delete();
+
+        DB::table('pos_payments')
+            ->insert($payments);
+
+        $this->info('Purchase payments copied !');
+
+        DB::table('pos_payment_dues')
+            ->delete();
+
+        DB::table('pos_payment_dues')
+            ->insert($dues);
+
+        $this->info('purchase payment dues copied !');
     }
 
     public function handleProcurementProducts()
@@ -757,20 +810,20 @@ class Migrator extends Command
         $newTablePrefix = 'pos_';
 
         $newTable = match ($this->table) {
-            TableEnum::ProductsCategories => $newTablePrefix.'product_categories',
-            TableEnum::Products => $newTablePrefix.'products',
-            TableEnum::UnitsGroups => $newTablePrefix.'unit_groups',
-            TableEnum::Units => $newTablePrefix.'units',
-            TableEnum::ProductsUnitQuantities => $newTablePrefix.'product_units',
-            TableEnum::ProductsUnitQuantitiesInventory => $newTablePrefix.'inventories',
-            TableEnum::Customers => $newTablePrefix.'customers',
-            TableEnum::Orders => $newTablePrefix.'sales',
-            TableEnum::OrdersProducts => $newTablePrefix.'sales_items',
-            TableEnum::Providers => $newTablePrefix.'suppliers',
-            TableEnum::Procurements => $newTablePrefix.'purchases',
-            TableEnum::ProcurementsProducts => $newTablePrefix.'purchase_items',
-            TableEnum::OrdersRefunds => $newTablePrefix.'sales_returns',
-            TableEnum::OrdersProductsRefunds => $newTablePrefix.'sales_return_items',
+            TableEnum::ProductsCategories => $newTablePrefix . 'product_categories',
+            TableEnum::Products => $newTablePrefix . 'products',
+            TableEnum::UnitsGroups => $newTablePrefix . 'unit_groups',
+            TableEnum::Units => $newTablePrefix . 'units',
+            TableEnum::ProductsUnitQuantities => $newTablePrefix . 'product_units',
+            TableEnum::ProductsUnitQuantitiesInventory => $newTablePrefix . 'inventories',
+            TableEnum::Customers => $newTablePrefix . 'customers',
+            TableEnum::Orders => $newTablePrefix . 'sales',
+            TableEnum::OrdersProducts => $newTablePrefix . 'sales_items',
+            TableEnum::Providers => $newTablePrefix . 'suppliers',
+            TableEnum::Procurements => $newTablePrefix . 'purchases',
+            TableEnum::ProcurementsProducts => $newTablePrefix . 'purchase_items',
+            TableEnum::OrdersRefunds => $newTablePrefix . 'sales_returns',
+            TableEnum::OrdersProductsRefunds => $newTablePrefix . 'sales_return_items',
         };
 
         $this->init($newTable);
