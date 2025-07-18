@@ -14,9 +14,25 @@ class Migrator extends Command
 
     protected $query;
 
-    protected $from = 'sewa5151';
+    // protected $from = '5151';
 
-    protected $newDbName = 'tenant1';
+    protected $from = '5252';
+
+    // 5151 108 5252 109
+
+    // protected $business_id = 108;
+
+    protected $business_id = 109;
+
+    protected $offset = 18000;
+
+    // protected $offset = 0;
+
+    // protected $shouldPrune = true;
+
+    protected $shouldPrune = false;
+
+    protected $newDbName = 'tenant113';
 
     /* 5151 to sewasanitary */
 
@@ -43,6 +59,8 @@ class Migrator extends Command
             $this->table = $table;
 
             $this->processData();
+
+            // $this->query->statement('ALTER TABLE orders AUTO_INCREMENT = 36000');
 
             $this->resetdb();
         }
@@ -89,7 +107,8 @@ class Migrator extends Command
                 ->sum('cost');
 
             $data[] = [
-                'id' => $item->id,
+                'id' => $item->id + $this->offset,
+                'business_id' => $this->business_id,
                 'name' => $item->name,
                 'phone' => $item->phone,
                 'total_purchased' => intval($total_purchased) * 100,
@@ -111,7 +130,9 @@ class Migrator extends Command
         /* New sewasanitary db */
 
         /* prune existing products */
-        $this->query->delete();
+        if ($this->shouldPrune) {
+            $this->query->delete();
+        }
 
         /* Copy products */
         foreach ($chunks as $chunk) {
@@ -128,8 +149,9 @@ class Migrator extends Command
 
         foreach (DB::table('pos_suppliers')->get() as $supplier) {
             DB::table('pos_ledgers')->insert([
+                'business_id' => $this->business_id,
                 'ledgerable_type' => 'App\Models\Tenant\Pos\Supplier',
-                'ledgerable_id' => $supplier->id,
+                'ledgerable_id' => $supplier->id + $this->offset,
                 'type' => 'opening-balance',
                 'amount' => $supplier->total_due,
                 'balance' => $supplier->total_due,
@@ -152,12 +174,14 @@ class Migrator extends Command
 
         $purchases->each(function ($item) use (&$data, &$payments, &$dues) {
             $data[] = [
-                'id' => $item->id,
+                'id' => $item->id + $this->offset,
+                'business_id' => $this->business_id,
                 'notes' => $item->name,
-                'supplier_id' => $item->provider_id,
+                'supplier_id' => $item->provider_id + $this->offset,
                 'purchase_date' => $item->invoice_date ?? now(),
                 'invoice_number' => $item->invoice_reference,
-                'total_amount' => intval($item->cost) * 100,
+                'sub_total' => intval($item->cost) * 100,
+                'taxable_amount' => intval($item->cost) * 100,
                 'created_at' => $item->created_at,
                 'updated_at' => $item->updated_at,
             ];
@@ -173,8 +197,9 @@ class Migrator extends Command
             }
 
             $payments[] = [
+                'business_id' => $this->business_id,
                 'payable_type' => 'App\Models\Tenant\Pos\Purchase',
-                'payable_id' => $item->id,
+                'payable_id' => $item->id + $this->offset,
                 'method' => 'Bank',
                 'amount' => intval($paid_amount) * 100,
                 'type' => 'purchase',
@@ -184,8 +209,9 @@ class Migrator extends Command
 
             if ($item->due_amount != 0) {
                 $dues[] = [
+                    'business_id' => $this->business_id,
                     'dueable_type' => 'App\Models\Tenant\Pos\Purchase',
-                    'dueable_id' => $item->id, // purchase id
+                    'dueable_id' => $item->id + $this->offset, // purchase id
                     'amount' => intval($item->due_amount) * 100,
                     'status' => 'due',
                     'created_at' => $item->created_at,
@@ -205,27 +231,37 @@ class Migrator extends Command
         /* New sewasanitary db */
 
         /* prune existing purchases */
-        $this->query->delete();
+        if ($this->shouldPrune) {
+            $this->query->delete();
+        }
 
         /* Copy products */
+        DB::statement('SET FOREIGN_KEY_CHECKS=0;');
+
         foreach ($chunks as $chunk) {
             $this->query->insert($chunk->toArray());
         }
+
+        DB::statement('SET FOREIGN_KEY_CHECKS=1;');
 
         $this->info('Purchases copied !');
 
         // handle procurements payment and due  
 
-        DB::table('pos_payments')
-            ->delete();
+        if ($this->shouldPrune) {
+            DB::table('pos_payments')
+                ->delete();
+        }
 
         DB::table('pos_payments')
             ->insert($payments);
 
         $this->info('Purchase payments copied !');
 
-        DB::table('pos_payment_dues')
-            ->delete();
+        if ($this->shouldPrune) {
+            DB::table('pos_payment_dues')
+                ->delete();
+        }
 
         DB::table('pos_payment_dues')
             ->insert($dues);
@@ -242,9 +278,10 @@ class Migrator extends Command
 
         $products->each(function ($item) use (&$data) {
             $data[] = [
-                'id' => $item->id,
-                'purchase_id' => $item->procurement_id,
-                'product_id' => $item->product_id,
+                'id' => $item->id + $this->offset,
+                'business_id' => $this->business_id,
+                'purchase_id' => $item->procurement_id + $this->offset,
+                'product_id' => $item->product_id + $this->offset,
                 'quantity' => $item->quantity,
                 'amount' => intval($item->purchase_price) * 100,
                 'created_at' => $item->created_at,
@@ -263,7 +300,9 @@ class Migrator extends Command
         /* New sewasanitary db */
 
         /* prune existing products */
-        $this->query->delete();
+        if ($this->shouldPrune) {
+            $this->query->delete();
+        }
 
         /* Copy products */
         foreach ($chunks as $chunk) {
@@ -282,7 +321,8 @@ class Migrator extends Command
 
         $cats->each(function ($item) use (&$preparedCats) {
             $preparedCats[] = [
-                'id' => $item->id,
+                'id' => $item->id + $this->offset,
+                'business_id' => $this->business_id,
                 'name' => ucwords($item->name),
                 'created_at' => $item->created_at,
                 'updated_at' => $item->updated_at,
@@ -294,7 +334,9 @@ class Migrator extends Command
         /* New sewasanitary db */
 
         /* prune existing categories */
-        $this->query->delete();
+        if ($this->shouldPrune) {
+            $this->query->delete();
+        }
 
         /* Copy categories */
         $this->query->insert($preparedCats);
@@ -311,9 +353,10 @@ class Migrator extends Command
 
         $products->each(function ($item) use (&$data) {
             $data[] = [
-                'id' => $item->id,
+                'id' => $item->id + $this->offset,
+                'business_id' => $this->business_id,
                 'name' => $item->name,
-                'category_id' => $item->category_id,
+                'category_id' => $item->category_id + $this->offset,
                 'visible' => true,
                 'created_at' => $item->created_at,
                 'updated_at' => $item->updated_at,
@@ -331,7 +374,9 @@ class Migrator extends Command
         /* New sewasanitary db */
 
         /* prune existing products */
-        $this->query->delete();
+        if ($this->shouldPrune) {
+            $this->query->delete();
+        }
 
         /* Copy products */
         foreach ($chunks as $chunk) {
@@ -350,7 +395,8 @@ class Migrator extends Command
 
         $groups->each(function ($item) use (&$preparedGroups) {
             $preparedGroups[] = [
-                'id' => $item->id,
+                'id' => $item->id + $this->offset,
+                'business_id' => $this->business_id,
                 'name' => ucfirst($item->name),
                 'created_at' => $item->created_at,
                 'updated_at' => $item->updated_at,
@@ -362,7 +408,9 @@ class Migrator extends Command
         /* New sewasanitary db */
 
         /* prune existing groups */
-        $this->query->delete();
+        if ($this->shouldPrune) {
+            $this->query->delete();
+        }
 
         /* Copy groups */
         $this->query->insert($preparedGroups);
@@ -379,9 +427,10 @@ class Migrator extends Command
 
         $units->each(function ($item) use (&$preparedUnits) {
             $preparedUnits[] = [
-                'id' => $item->id,
+                'id' => $item->id + $this->offset,
+                'business_id' => $this->business_id,
                 'name' => ucfirst($item->name),
-                'unit_group_id' => $item->group_id,
+                'unit_group_id' => $item->group_id + $this->offset,
                 'created_at' => $item->created_at,
                 'updated_at' => $item->updated_at,
             ];
@@ -392,7 +441,9 @@ class Migrator extends Command
         /* New sewasanitary db */
 
         /* prune existing units */
-        $this->query->delete();
+        if ($this->shouldPrune) {
+            $this->query->delete();
+        }
 
         /* Copy units */
         $this->query->insert($preparedUnits);
@@ -411,9 +462,10 @@ class Migrator extends Command
         /* needs product_id, unit_id, price conversion_factor, is_base, */
         $products->each(function ($item) use (&$data) {
             $data[] = [
-                'id' => $item->id,
-                'product_id' => $item->product_id,
-                'unit_id' => $item->unit_id,
+                'id' => $item->id + $this->offset,
+                'business_id' => $this->business_id,
+                'product_id' => $item->product_id + $this->offset,
+                'unit_id' => $item->unit_id + $this->offset,
                 'conversion_factor' => 1,
                 'price' => $item->sale_price * 100, // convert to paisa while storing
                 'is_base' => true,
@@ -433,7 +485,9 @@ class Migrator extends Command
         /* New sewasanitary db */
 
         /* prune existing product units */
-        $this->query->delete();
+        if ($this->shouldPrune) {
+            $this->query->delete();
+        }
 
         /* Copy products */
         foreach ($chunks as $chunk) {
@@ -452,8 +506,9 @@ class Migrator extends Command
 
         $products->each(function ($item) use (&$data) {
             $data[] = [
-                'id' => $item->id,
-                'product_id' => $item->product_id,
+                'id' => $item->id + $this->offset,
+                'business_id' => $this->business_id,
+                'product_id' => $item->product_id + $this->offset,
                 'current_stock' => $item->quantity,
                 'created_at' => $item->created_at,
                 'updated_at' => $item->updated_at,
@@ -471,7 +526,9 @@ class Migrator extends Command
         /* New sewasanitary db */
 
         /* prune existing product units */
-        $this->query->delete();
+        if ($this->shouldPrune) {
+            $this->query->delete();
+        }
 
         /* Copy products */
         foreach ($chunks as $chunk) {
@@ -495,7 +552,8 @@ class Migrator extends Command
                 ->sum('total');
 
             $data[] = [
-                'id' => $item->id,
+                'id' => $item->id + $this->offset,
+                'business_id' => $this->business_id,
                 'name' => ucwords($item->name),
                 'phone' => $item->phone,
                 'total_sold' => intval(($total_sold * 100)),
@@ -517,7 +575,9 @@ class Migrator extends Command
         /* New sewasanitary db */
 
         /* prune existing customers */
-        $this->query->delete();
+        if ($this->shouldPrune) {
+            $this->query->delete();
+        }
 
         /* Copy customers */
         foreach ($chunks as $chunk) {
@@ -533,13 +593,16 @@ class Migrator extends Command
 
     public function createCustomerOpeningBalance()
     {
-        DB::table('pos_ledgers')->delete();
+        if($this->shouldPrune){
+            DB::table('pos_ledgers')->delete();
+        }
 
         foreach (DB::table('pos_customers')->get() as $customer) {
             DB::table('pos_ledgers')->insert([
                 'ledgerable_type' => 'App\Models\Tenant\Pos\Customer',
-                'ledgerable_id' => $customer->id,
+                'ledgerable_id' => $customer->id + $this->offset,
                 'type' => 'opening-balance',
+                'business_id' => $this->business_id,
                 'amount' => $customer->total_due,
                 'balance' => $customer->total_due,
                 'created_at' => now(),
@@ -557,9 +620,10 @@ class Migrator extends Command
 
         $orders->each(function ($item) use (&$data) {
             $data[] = [
-                'id' => $item->id,
+                'id' => $item->id + $this->offset,
+                'business_id' => $this->business_id,
                 'invoice_number' => $item->code,
-                'customer_id' => $item->customer_id,
+                'customer_id' => $item->customer_id + $this->offset,
                 'amount' => $item->total * 100,
                 'discount' => $item->discount * 100,
                 'status' => 'confirmed',
@@ -580,7 +644,9 @@ class Migrator extends Command
         /* New sewasanitary db */
 
         /* prune existing customers */
-        $this->query->delete();
+        if ($this->shouldPrune) {
+            $this->query->delete();
+        }
 
         /* Copy customers */
         foreach ($chunks as $chunk) {
@@ -607,8 +673,9 @@ class Migrator extends Command
 
             if ($total_paid < $order_total) {
                 $order_dues[] = [
+                    'business_id' => $this->business_id,
                     'dueable_type' => 'App\Models\Tenant\Pos\Sale',
-                    'dueable_id' => $item->id, // order id
+                    'dueable_id' => $item->id + $this->offset, // order id
                     'amount' => intval($order_total - $total_paid) * 100,
                     'status' => 'due',
                     'created_at' => $item->created_at,
@@ -618,8 +685,9 @@ class Migrator extends Command
 
             foreach ($payments as $item) {
                 $order_payments[] = [
+                    'business_id' => $this->business_id,
                     'payable_type' => 'App\Models\Tenant\Pos\Sale',
-                    'payable_id' => $item->order_id,
+                    'payable_id' => $item->order_id + $this->offset,
                     'method' => $item->identifier == 'Bank Payment' ? 'Bank' : 'Cash',
                     'amount' => (int) $item->value * 100,
                     'type' => 'sale',
@@ -631,13 +699,17 @@ class Migrator extends Command
 
         $this->changeToTargetDb();
 
-        DB::table('pos_payment_dues')->delete();
+        if ($this->shouldPrune) {
+            DB::table('pos_payment_dues')->delete();
+        }
 
         // insert dues
         DB::table('pos_payment_dues')
             ->insert($order_dues);
 
-        DB::table('pos_payments')->delete();
+        if ($this->shouldPrune) {
+            DB::table('pos_payments')->delete();
+        }
 
         // insert payments
         foreach ($order_payments as $data) {
@@ -661,9 +733,10 @@ class Migrator extends Command
         /* sale_id, product_id, quantity, amount */
         $orderProducts->each(function ($item) use (&$data) {
             $data[] = [
-                'id' => $item->id,
-                'sale_id' => $item->order_id,
-                'product_id' => $item->product_id,
+                'id' => $item->id + $this->offset,
+                'business_id' => $this->business_id,
+                'sale_id' => $item->order_id + $this->offset,
+                'product_id' => $item->product_id + $this->offset,
                 'quantity' => $item->quantity,
                 'amount' => $item->unit_price * 100,
                 'created_at' => $item->created_at,
@@ -682,7 +755,9 @@ class Migrator extends Command
         /* New sewasanitary db */
 
         /* prune existing sales items */
-        $this->query->delete();
+        if ($this->shouldPrune) {
+            $this->query->delete();
+        }
 
         /* Copy order_products to sales_items */
         foreach ($chunks as $chunk) {
@@ -706,8 +781,9 @@ class Migrator extends Command
                 return;
             }
             $data[] = [
-                'id' => $item->id,
-                'sale_id' => $item->order_id,
+                'id' => $item->id + $this->offset,
+                'business_id' => $this->business_id,
+                'sale_id' => $item->order_id + $this->offset,
                 'amount' => $item->total * 100,
                 'return_date' => $item->created_at,
                 'created_at' => $item->created_at,
@@ -726,7 +802,9 @@ class Migrator extends Command
         /* New sewasanitary db */
 
         /* prune existing sales items */
-        $this->query->delete();
+        if ($this->shouldPrune) {
+            $this->query->delete();
+        }
 
         /* Copy order_products to sales_items */
         foreach ($chunks as $chunk) {
@@ -750,11 +828,11 @@ class Migrator extends Command
                 return;
             }
             $data[] = [
-                'id' => $item->id,
-                'sales_return_id' => $item->order_refund_id,
-                'product_id' => $item->product_id,
+                'id' => $item->id + $this->offset,
+                'business_id' => $this->business_id,
+                'sales_return_id' => $item->order_refund_id + $this->offset,
+                'product_id' => $item->product_id + $this->offset,
                 'quantity' => $item->quantity,
-                'amount' => $item->unit_price * 100,
                 'created_at' => $item->created_at,
                 'updated_at' => $item->updated_at,
             ];
@@ -771,7 +849,10 @@ class Migrator extends Command
         /* New sewasanitary db */
 
         /* prune existing sales items */
-        $this->query->delete();
+        if($this->shouldPrune)
+        {
+            $this->query->delete();
+        }
 
         /* Copy order_products to sales_items */
         foreach ($chunks as $chunk) {
